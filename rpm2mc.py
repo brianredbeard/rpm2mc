@@ -26,7 +26,10 @@ import yaml
 from optparse import OptionParser
 
 # Create the stub of a machine-config object to hold our resulting output
-mco = {"spec": {"config": {
+mco = { "apiVersion": "machineconfiguration.openshift.io/v1",
+        "kind": "MachineConfig",
+        "spec": {"config": {
+                        "ignition": {"version": "2.2.0"},
                         "storage": {"files": []},
                         "systemd": {"units": []}
                         }
@@ -39,21 +42,32 @@ class FileNotFoundError(Exception):
 
 def file_to_data(path):
     """Convert a file (specified by a path) into a data URI."""
-    if not os.path.exists(path):
-        raise FileNotFoundError
+    try:
+        if not os.path.exists(path):
+            raise FileNotFoundError
+    except FileNotFoundError:
+        return None
     mime, _ = mimetypes.guess_type(path)
-    data64 = base64.b64encode(open(path, "rb").read())
-    return 'data:{};base64,{}'.format(mime, data64.decode('UTF-8'))
+    if mime is None:
+        mime = ""
+    try:
+        data64 = base64.b64encode(open(path, "rb").read())
+        return 'data:{};base64,{}'.format(mime, data64.decode('UTF-8'))
+    except PermissionError:
+        return None
 
 def main():
-    usage = "usage: %prog [options] arg"
+    """Main execution thread"""
+
+    usage = "usage: %prog [options] RPM"
     parser = OptionParser(usage)
     parser.add_option("-f", "--file", dest="isFile",
                       action="store_true",
-                      help="read data from FILENAME")
+                      help="read data from RPM")
     parser.add_option("-a", "--all", action="store_true", dest="allFiles",
                       help="store all files, not just configs and systemd units")
-    parser.add_option("-v", action="store_true", dest="verbose")
+    parser.add_option("-v", action="store_true", dest="verbose",
+                     help="increase verbosity of output")
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
